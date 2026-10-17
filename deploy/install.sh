@@ -2,12 +2,12 @@
 # Impro IT: serverga bitta buyruq bilan o'rnatish.
 # Talab: toza Ubuntu 22.04/24.04 yoki Debian 11/12 server, root (sudo) huquqi, domen serverning IP manziliga yo'naltirilgan.
 # Ishlatish:
-#   curl -fsSL https://raw.githubusercontent.com/Sladusuz/impro/main/deploy/install.sh | sudo bash -s -- kicksport.uz
-# (ixtiyoriy) admin parolini o'zingiz belgilash:  ... -s -- kicksport.uz MeningParolim123
+#   curl -fsSL https://raw.githubusercontent.com/Sladusuz/impro/main/deploy/install.sh | sudo bash -s -- improuzbekiston.uz
+# (ixtiyoriy) admin parolini o'zingiz belgilash:  ... -s -- improuzbekiston.uz MeningParolim123
 set -euo pipefail
 
 DOMAIN="${1:-}"
-if [ -z "$DOMAIN" ]; then echo "Domenni yozing. Misol: bash install.sh kicksport.uz"; exit 1; fi
+if [ -z "$DOMAIN" ]; then echo "Domenni yozing. Misol: bash install.sh improuzbekiston.uz"; exit 1; fi
 if [ "$(id -u)" != "0" ]; then echo "Root huquqi kerak: sudo bash install.sh $DOMAIN"; exit 1; fi
 
 REPO="https://github.com/Sladusuz/impro.git"
