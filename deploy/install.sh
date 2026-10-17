@@ -2,12 +2,12 @@
 # Impro IT: serverga bitta buyruq bilan o'rnatish.
 # Talab: toza Ubuntu 22.04/24.04 yoki Debian 11/12 server, root (sudo) huquqi, domen serverning IP manziliga yo'naltirilgan.
 # Ishlatish:
-#   curl -fsSL https://raw.githubusercontent.com/Sladusuz/impro/main/deploy/install.sh | sudo bash -s -- improuzbekiston.uz
-# (ixtiyoriy) admin parolini o'zingiz belgilash:  ... -s -- improuzbekiston.uz MeningParolim123
+#   curl -fsSL https://raw.githubusercontent.com/Sladusuz/impro/main/deploy/install.sh | sudo bash -s -- kicksport.uz
+# (ixtiyoriy) admin parolini o'zingiz belgilash:  ... -s -- kicksport.uz MeningParolim123
 set -euo pipefail
 
 DOMAIN="${1:-}"
-if [ -z "$DOMAIN" ]; then echo "Domenni yozing. Misol: bash install.sh improuzbekiston.uz"; exit 1; fi
+if [ -z "$DOMAIN" ]; then echo "Domenni yozing. Misol: bash install.sh kicksport.uz"; exit 1; fi
 if [ "$(id -u)" != "0" ]; then echo "Root huquqi kerak: sudo bash install.sh $DOMAIN"; exit 1; fi
 
 REPO="https://github.com/Sladusuz/impro.git"
@@ -49,12 +49,14 @@ if [ ! -f "$ENVF" ]; then
 PORT=3000
 DATA_DIR=$DATA
 TRUST_PROXY=1
+ROOT_DOMAIN=$DOMAIN
 ADMIN_PASSWORD=$PW
 ENV
   chmod 600 "$ENVF"
   echo "$PW" > /root/impro-admin-parol.txt
   chmod 600 /root/impro-admin-parol.txt
 fi
+grep -q '^ROOT_DOMAIN=' "$ENVF" || echo "ROOT_DOMAIN=$DOMAIN" >> "$ENVF"
 
 say "[5/6] Xizmatni sozlash va ishga tushirish"
 cat > /etc/systemd/system/impro.service <<UNIT
@@ -85,12 +87,25 @@ systemctl restart impro
 
 say "[6/6] HTTPS, xavfsizlik va zaxira nusxa"
 cat > /etc/caddy/Caddyfile <<CADDY
+{
+	on_demand_tls {
+		ask http://127.0.0.1:3000/_ask
+	}
+}
 $DOMAIN {
 	encode gzip zstd
 	reverse_proxy 127.0.0.1:3000
 }
 www.$DOMAIN {
 	redir https://$DOMAIN{uri} permanent
+}
+# Mijozlar saytlari (nomi.$DOMAIN) va ularning o'z domenlari: sertifikat talab bo'yicha, faqat bizning domenlarga
+https:// {
+	tls {
+		on_demand
+	}
+	encode gzip zstd
+	reverse_proxy 127.0.0.1:3000
 }
 CADDY
 systemctl enable caddy >/dev/null 2>&1

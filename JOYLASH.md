@@ -10,6 +10,7 @@ Server joylangach, butun sayt (asosiy sahifa, konstruktor, kabinet, admin) shu s
 **2. Domenni serverga yo'naltiring** (@HOST paneli → DNS-менеджер → Редактор зон). `improuzbekiston.uz` uchun:
 - `@` dagi 4 ta eski A yozuvini (GitHub: 185.199.108–111.153) **o'chiring**, o'rniga bitta A yozuv qo'shing: `@` → **VPS IP manzili**.
 - `www` dagi CNAME (`sladusuz.github.io`) ni **o'chiring**, o'rniga A yozuv: `www` → **VPS IP manzili**.
+- **Mijozlar subdomenlari uchun** yana bitta A yozuv: `*` (yulduzcha) → **VPS IP manzili**. Shunda `lola-salon.improuzbekiston.uz` kabi manzillar ishlaydi (sertifikat avtomatik olinadi).
 - `mail`, `ftp`, `MX`, `TXT` yozuvlariga **tegmang** (pochta uchun).
 - Saqlang. DNS yangilanishi 5 daqiqadan bir necha soatgacha davom etadi.
 
@@ -32,6 +33,10 @@ Oxirida ekranda **admin paroli** chiqadi (u serverda `/root/impro-admin-parol.tx
 **5. GitHub Pages ni o'chiring** (ixtiyoriy, tartib uchun): repo → Settings → Pages → *Unpublish site*.
 
 ### Keyin
+- **Sotuv va to'lov:** admin → *Sozlamalar* da Payme/Click kalitlarini kiriting (yoki qo'lda to'lov ko'rsatmasini yozing), *Narxlar* da shablon narxini ($10) belgilang. Mijoz to'lagach sayt yuklab olish va subdomenda joylash ochiladi. Qo'lda to'lovni admin → *Mijoz saytlari* da «To'langan deb belgilash» bilan tasdiqlaysiz.
+- **Payme** kassa sozlamasida Endpoint URL: `https://improuzbekiston.uz/api/pay/payme` (hisob maydoni `order_id`). **Click** da Prepare/Complete URL: `https://improuzbekiston.uz/api/pay/click`. Avval ularning sinov (sandbox) muhitida tekshiring.
+- **AI yordamchi:** admin → *Sozlamalar* → AI bo'limiga Claude API kalitini kiriting.
+- Eski o'rnatish bo'lsa, subdomenlar uchun Caddy sozlamasi yangilanishi kerak: `sudo bash /opt/impro/deploy/install.sh improuzbekiston.uz` ni qayta ishga tushiring (ma'lumotlarga tegmaydi).
 - **Yangilash:** `sudo bash /opt/impro/deploy/update.sh` (ma'lumotlar saqlanib qoladi)
 - **Loglar:** `journalctl -u impro -f`
 - **Qayta ishga tushirish:** `sudo systemctl restart impro`
