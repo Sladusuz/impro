@@ -466,6 +466,8 @@ async function handleCallback(env, st, q) {
     rec.flow = { step: 'payamt', d: {} }; await saveRec(st, chat, rec);
     return say(env, chat, "💳 <b>To'lov</b>\nQancha to'laysiz? Summani so'mda yozing (masalan: <code>1500000</code>). Bekor qilish: /cancel");
   }
+  const ppm = /^pp:([a-f0-9]{6,24}):([a-f0-9]{6,24})$/.exec(d);
+  if (ppm) { if (!isAdmin) return ans("Ruxsat yo'q"); const k = 'pr:' + ppm[2] + ':' + ppm[1], m = await st.get(k); if (!m) return ans('Loyiha topilmadi'); m.paid = true; await st.put(k, m, 0, m); await ans('Tasdiqlandi'); return tg(env, 'editMessageReplyMarkup', { chat_id: chat, message_id: q.message.message_id, reply_markup: { inline_keyboard: [[{ text: "✅ To'lov tasdiqlandi", callback_data: 'noop' }]] } }); }
   const pcm = /^(pc|px):(-?\d+)$/.exec(d);
   if (pcm) {
     if (!isAdmin) return ans("Ruxsat yo'q");
@@ -593,6 +595,8 @@ async function handleUpdate(env, upd) {
     return say(env, chat, 'Format: <code>/havola instagram</code>\n\n' + (Object.keys(cnt).length ? '📈 7 kun manbalari: ' + Object.entries(cnt).map(([k, v]) => `${esc(k)} ${v}`).join(' · ') : "Hozircha manba bo'yicha mijoz yo'q."));
   }
   if (cmd === '/panel') { if (!ENV_ORIGIN) return say(env, chat, 'Panel manzili hali aniqlanmadi, /setup ni oching.'); return say(env, chat, '📱 Admin panelini oching:', { reply_markup: { inline_keyboard: [[{ text: '📊 Panel', web_app: { url: ENV_ORIGIN + '/app' } }]] } }); }
+  if (cmd === '/mijozlar') { const us = (await st.list('u:')).map((k) => k.metadata).filter(Boolean).sort((a, b) => b.t - a.t); return say(env, chat, `👥 <b>Ro'yxatdan o'tgan mijozlar: ${us.length}</b>\n` + (us.slice(0, 40).map((u, i) => `${i + 1}. ${esc(u.n)} · ${esc(u.p)} · ${new Date(u.t + TZ).toISOString().slice(0, 10)}`).join('\n') || 'Hali yo\'q') + (us.length > 40 ? '\n… to\'liq ro\'yxat: /zaxira' : '') + '\n\nℹ️ Parollar xeshlangan holda saqlanadi, ularni hech kim (men ham) ko\'ra olmaydi. Mijoz parolni unutsa: /parolber <telefon>'); }
+  if (cmd === '/parolber') { const k = pDigits(arg).slice(-9), uid = k ? await st.get('up:' + k) : null, u = uid ? await st.get('u:' + uid) : null; if (!u) return say(env, chat, "Bunday mijoz topilmadi. Format: /parolber 901234567"); const np = pRnd(4); u.salt = pRnd(16); u.it = 10000; u.hash = await pwHash(env, np, u.salt, 10000); await st.put('u:' + u.id, u, 0, { n: u.name.slice(0, 40), p: u.phone.slice(0, 25), t: Date.parse(u.createdAt) || Date.now() }); return say(env, chat, `🔑 ${esc(u.name)} uchun yangi vaqtinchalik parol: <code>${np}</code>\nMijozga yuboring, kirgach almashtirsin.`); }
   if (cmd === '/zaxira') return say(env, chat, (await backup(env, st, [chat])) ? '💾 Zaxira yuborildi.' : 'Zaxira yuborilmadi.');
   if (cmd === '/oqit') {
     const q = (await st.get('unq')) || [], mm = /^(\d+)\s+([\s\S]{3,380})$/.exec(arg);
@@ -795,7 +799,7 @@ async function backup(env, st, admins) {
   const ls = await listLeads(st), cs = (await st.list('c:')).map((k) => ({ id: k.name.slice(2), ...(k.metadata || {}) })), kb = (await st.get('kb')) || [];
   const csv = ['Sana,Ism,Telefon,Manba,Teg,Havola,Izoh', ...ls.map((l) => [new Date(l.t + TZ).toISOString().replace('T', ' ').slice(0, 16), l.n, l.p, l.s, l.g, l.r, l.x].map(csvCell).join(','))].join('\n');
   let ok = 0;
-  for (const a of admins) { if (await sendDoc(env, a, `zaxira-lidlar-${dkey()}.csv`, csv, `💾 Zaxira: ${ls.length} lid, ${cs.length} mijoz, ${kb.length} bilim`)) ok++; await sendDoc(env, a, `zaxira-baza-${dkey()}.json`, JSON.stringify({ kb, customers: cs, leads: ls }, null, 1)); }
+  for (const a of admins) { if (await sendDoc(env, a, `zaxira-lidlar-${dkey()}.csv`, csv, `💾 Zaxira: ${ls.length} lid, ${cs.length} mijoz, ${kb.length} bilim`)) ok++; await sendDoc(env, a, `zaxira-baza-${dkey()}.json`, JSON.stringify({ kb, customers: cs, leads: ls }, null, 1)); await sendDoc(env, a, `zaxira-platforma-${dkey()}.json`, JSON.stringify(await platformDump(st), null, 1), "🔐 Mijoz hisoblari, loyihalar va buyurtmalar (maxfiy: parol xeshlari bor)"); }
   return ok;
 }
 // Javobsiz savollar: bot o'rganishi uchun (/oqit)
@@ -903,7 +907,7 @@ async function paymeRpc(req, env) {
       const p = await byTx(params.id); if (!p) return fail(PE.nf);
       if (p.tx.state === 1) {
         if (Date.now() - p.tx.createTime > PTIMEOUT) { p.tx.state = -1; p.tx.reason = 4; p.tx.cancelTime = Date.now(); await payOrderPut(st, p); return fail(PE.cant); }
-        p.tx.state = 2; p.tx.performTime = Date.now(); p.state = 'paid'; await payOrderPut(st, p);
+        p.tx.state = 2; p.tx.performTime = Date.now(); p.state = 'paid'; await payOrderPut(st, p); await markProjectPaid(st, p);
         await ev(st, { k: 'pay', c: 0, n: 'Payme', x: sum(p.uzs) + " so'm" });
         for (const a of await admins()) await say(env, a, `💳 <b>To'lov qabul qilindi (Payme)</b>\n💰 <b>${sum(p.uzs)} so'm</b>\n🧾 #${p.id}${p.note ? '\n📝 ' + esc(p.note) : ''}`);
         await pushPhone(env, "To'lov qabul qilindi", `${sum(p.uzs)} so'm (Payme)`, 4, 'moneybag');
@@ -1010,7 +1014,7 @@ async function clickRpc(req, env) {
     if (!p.click || String(f.merchant_prepare_id) !== String(p.click.prepareId)) return out({ error: -6, error_note: 'Transaction does not exist' });
     if (p.state === 'paid') return out({ merchant_prepare_id: p.id, merchant_confirm_id: p.id, error: -4, error_note: 'Already paid' });
     if (Number(f.error) < 0) { p.click.cancelled = true; await payOrderPut(st, p); return out({ merchant_prepare_id: p.id, merchant_confirm_id: p.id, error: -9, error_note: 'Transaction cancelled' }); }
-    p.state = 'paid'; p.paidAt = Date.now(); p.ref = f.click_paydoc_id; await payOrderPut(st, p);
+    p.state = 'paid'; p.paidAt = Date.now(); p.ref = f.click_paydoc_id; await payOrderPut(st, p); await markProjectPaid(st, p);
     await ev(st, { k: 'pay', c: 0, n: 'Click', x: sum(p.uzs) + " so'm" });
     for (const a of await adminsOf(env, st)) await say(env, a, `💳 <b>To'lov qabul qilindi (Click)</b>\n💰 <b>${sum(p.uzs)} so'm</b>\n🧾 #${p.id}${p.note ? '\n📝 ' + esc(p.note) : ''}`);
     await pushPhone(env, "To'lov qabul qilindi", `${sum(p.uzs)} so'm (Click)`, 4, 'moneybag');
@@ -1019,6 +1023,7 @@ async function clickRpc(req, env) {
   return out({ error: -3, error_note: 'Action not found' });
 }
 
+async function markProjectPaid(st, p) { if (!p.projectId || !p.ownerId) return; const k = 'pr:' + p.ownerId + ':' + p.projectId, m = await st.get(k); if (m) { m.paid = true; m.updatedAt = new Date().toISOString(); await st.put(k, m, 0, m); } }
 export default {
   async fetch(req, env, ctx) {
     const url = new URL(req.url); ENV_ORIGIN = url.origin;
@@ -1043,6 +1048,9 @@ export default {
     if (url.pathname === '/api/app' && req.method === 'POST') return appApi(req, env);
     if (url.pathname === '/stats' && req.method === 'GET') return statsApi(req, env);
     if (url.pathname === '/pay/payme' && req.method === 'POST') return new Response(JSON.stringify(await paymeRpc(req, env)), { headers: { 'content-type': 'application/json' } });
+    if (url.pathname.startsWith('/api/')) return platformApi(req, env, ctx, url);
+    if (url.pathname.startsWith('/s/') && req.method === 'GET') return sitePage(req, env, ctx, url);
+    if (url.pathname.startsWith('/uploads/') && req.method === 'GET') return serveUpload(req, env, url);
     if (url.pathname === '/sms') return smsApi(req, env);
     if (url.pathname === '/pay/click' && req.method === 'POST') return new Response(JSON.stringify(await clickRpc(req, env)), { headers: { 'content-type': 'application/json' } });
     if (url.pathname === '/err') return errApi(req, env);
